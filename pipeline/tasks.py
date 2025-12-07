@@ -73,15 +73,15 @@ def transform_ura_task(data):
 @task(name="Load Postgres", log_prints=True)
 def load_to_postgres_task(data, doc_type: str):
     if not data:
-        logger.warning("No data to save to PostgreSQL.")
+        print("No data to save to PostgreSQL.")
         return
 
-    logger.info(f"Saving {len(data)} SQL records for: {doc_type}")
+    print(f"Saving {len(data)} SQL records for: {doc_type}")
 
     if doc_type == "ura_circular":
         objs = [
             RegulatoryRule(
-                rule_id=item.rule_id,
+                rule_id=str(item.rule_id)[:250], # Safety clip for ID
                 rule_summary=item.rule_summary,
                 measurement_basis=item.measurement_basis
             )
@@ -90,16 +90,20 @@ def load_to_postgres_task(data, doc_type: str):
         RegulatoryRule.objects.bulk_create(objs, ignore_conflicts=True)
 
     elif doc_type == "project_schedule":
-        objs = [
-            ProjectTask(
-                task_id=item.task_id,
-                task_name=item.task_name,
-                duration_days=item.duration_days,
-                start_date=item.start_date,
-                finish_date=item.finish_date,
+        objs = []
+        for item in data:
+            # Safety: Ensure task_name is a string
+            safe_name = str(item.task_name) if item.task_name else ""
+
+            objs.append(
+                ProjectTask(
+                    task_id=item.task_id,
+                    task_name=safe_name, # TextField can now hold this, no matter the length
+                    duration_days=item.duration_days,
+                    start_date=item.start_date,
+                    finish_date=item.finish_date,
+                )
             )
-            for item in data
-        ]
         ProjectTask.objects.bulk_create(objs, ignore_conflicts=True)
 
 @task(name="Load Vector DB", log_prints=True)
