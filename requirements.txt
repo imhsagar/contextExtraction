@@ -1,0 +1,33 @@
+pytesseract
+pillow
+opencv-python
+pdf2image
+requests
+camelot-py
+sentence-transformers
+# Web Framework & API
+Django==4.2.16
+django-ninja==1.5.0
+django-ninja-extra==0.30.6
+
+# Data Validation
+pydantic==2.7.1
+
+# Database & Vectors
+psycopg2-binary==2.9.9
+chromadb==0.5.0
+
+# Orchestration
+prefect==3.0.0
+
+# Data Extraction
+pypdf==4.2.0
+pdfplumber==0.11.0
+openai==1.30.0
+python-dotenv==1.0.1
+
+# Utilities
+loguru==0.7.2
+pytest==8.2.0
+pytest-django==4.8.0
+numpy==1.26.4
