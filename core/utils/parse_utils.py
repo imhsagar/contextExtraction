@@ -5,10 +5,6 @@ from datetime import datetime
 from loguru import logger
 from pipeline.schemas import TaskSchema
 
-# ============================================================
-# 1. TEXT CLEANING UTILITIES
-# ============================================================
-
 def _clean_text(s: Optional[str]) -> str:
     """Normalize whitespace and remove weird characters."""
     if not s:
@@ -29,10 +25,6 @@ def _clean_task_name(name: Optional[str]) -> Optional[str]:
     # Reject header-like text
     if name.lower() in ["task name", "task", "name", "activity", "description"]: return None
     return name
-
-# ============================================================
-# 2. PARSING HELPERS (Dates, Ints, Durations)
-# ============================================================
 
 def _parse_int_safe(x) -> Optional[int]:
     """Parse ID-only integers."""
@@ -73,10 +65,6 @@ def _parse_date_flexible(s: Optional[str]):
         except:
             continue
     return None
-
-# ============================================================
-# 3. DATA CONVERSION & NORMALIZATION
-# ============================================================
 
 def safe_task_to_dict(t: Any) -> Dict:
     """Convert TaskSchema or dict to plain dict."""
@@ -131,10 +119,6 @@ def normalize_table_for_llm(table_rows: List[List[str]]) -> List[List[str]]:
 
     # Fallback
     return [r[:5] for r in rows]
-
-# ============================================================
-# 4. RULE-BASED PARSING LOGIC (The missing function!)
-# ============================================================
 
 def _parse_raw_table_rows(table_rows: List[List[str]], source_file: str, page_num: int = 1) -> List[TaskSchema]:
     """

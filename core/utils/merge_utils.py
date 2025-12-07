@@ -1,12 +1,8 @@
 from typing import List, Dict, Any
 from pipeline.schemas import TaskSchema
-from core.utils.parse_utils import _parse_date_flexible  # Import your existing parser
+from core.utils.parse_utils import _parse_date_flexible
 
 def merge_tasks(task_list: List[Any]) -> List[TaskSchema]:
-    """
-    Accepts: list of TaskSchema or list of dicts or mixed.
-    Returns: deduped list[TaskSchema].
-    """
     final: Dict[int, Dict] = {}
 
     for t in task_list:
@@ -60,6 +56,4 @@ def merge_tasks(task_list: List[Any]) -> List[TaskSchema]:
         if not old.get("duration_days") and t.get("duration_days"):
             final[tid]["duration_days"] = t["duration_days"]
 
-    # 5. Convert back to TaskSchema
-    # Now safe because dates are python objects, not dirty strings
     return [TaskSchema(**v) for v in final.values()]

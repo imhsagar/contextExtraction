@@ -1,54 +1,51 @@
-# core/table_parser.py
+# core/utils/table_parser.py
 import os
-import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import List, Dict, Optional
+from typing import List, Dict
 from loguru import logger
 
-from pipeline.schemas import TaskSchema
 from core.llm_client import LLMClient
-# Ensure this import matches the file above
 from core.utils.parse_utils import normalize_table_for_llm
 
 class LLMTableParser:
     def __init__(self):
         self.llm = LLMClient()
-        self.max_rows_per_chunk = 25
-        self.workers = int(os.getenv("EXTRACT_LLM_WORKERS", "4"))
+        self.max_rows_per_chunk = int(os.getenv("EXTRACT_MAX_ROWS_PER_CHUNK", "5"))
+        self.workers = int(os.getenv("EXTRACT_LLM_WORKERS", "2"))
+
+        logger.info(f"[LLM Table Parser] Initialized with Chunk Size: {self.max_rows_per_chunk}, Workers: {self.workers}")
 
     def _build_chunk_prompt(self, rows: List[List[str]], page_hint: int) -> str:
-        """Constructs the prompt with strict constraints against hallucinations."""
         csv_block = "\n".join([" | ".join(str(c) for c in r) for r in rows])
 
         return f"""
         You are a Data Engineer. Extract construction tasks from this table fragment.
         
         Context:
+        - Page Hint: {page_hint}
         - Columns: ID | Task Name | Duration | Start | Finish
 
         Instructions:
         1. Return ONLY valid JSON with a key 'tasks'.
         2. Schema: {{ "task_id": int, "task_name": str, "duration_days": int, "start_date": "YYYY-MM-DD", "finish_date": "YYYY-MM-DD" }}
-        3. CRITICAL: Do NOT merge multiple rows into one task. Keep task_name short and precise.
-        4. If a row has multiple unrelated concepts, split them or pick the main one.
-        5. Skip rows where ID is empty or not a number.
+        3. Skip rows where ID is empty or not a number.
+        4. If duration is empty, use 0. If dates are invalid, use null.
 
         Table Data:
         {csv_block}
         """
 
     def parse_table_hybrid(self, raw_rows: List[List[str]], page_num: int = 1) -> List[Dict]:
-        """
-        Main entry point. Normalizes table, chunks it, and processes with LLM.
-        """
-        # This call was failing because _clean_text was missing in parse_utils
         normalized = normalize_table_for_llm(raw_rows)
 
         if not normalized:
             return []
 
+        # Create chunks based on the configured size (now 5)
         chunks = [normalized[i:i + self.max_rows_per_chunk] for i in range(0, len(normalized), self.max_rows_per_chunk)]
+
         all_tasks = []
+        logger.info(f"[Table Parser] Processing {len(chunks)} chunks for page {page_num}...")
 
         with ThreadPoolExecutor(max_workers=self.workers) as executor:
             future_to_chunk = {}
@@ -59,7 +56,7 @@ class LLMTableParser:
 
             for future in as_completed(future_to_chunk):
                 try:
-                    result = future.result() # Returns {"tasks": [...]}
+                    result = future.result()
                     tasks = result.get("tasks", [])
                     if tasks:
                         all_tasks.extend(tasks)

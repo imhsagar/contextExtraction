@@ -3,12 +3,10 @@ import os
 import sys
 import django
 import uuid
+from loguru import logger
 from pathlib import Path
 from prefect import task
 
-# ==========================================
-# 1. BOOTSTRAP DJANGO
-# ==========================================
 project_root = Path(__file__).resolve().parent.parent
 sys.path.append(str(project_root))
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "proplens.settings")
@@ -22,13 +20,10 @@ from core.extractor import DocumentExtractor
 from pipeline.models import RegulatoryRule, ProjectTask
 from core.utils.chunk_utils import index_chunks_to_chroma, aggregate_tasks_by_building, create_semantic_chunks
 
-# -------------------------------------------------------------
-# EXTRACT
-# -------------------------------------------------------------
 @task(name="Extract Data", log_prints=True)
 def extract_document_task(file_path: str, doc_type: str):
     extractor = DocumentExtractor()
-    print(f"Starting extraction for: {file_path}")
+    logger.info(f"Starting extraction for: {file_path}")
 
     if doc_type == "ura_circular":
         extractor.extract_images_from_ura(file_path)
@@ -39,27 +34,21 @@ def extract_document_task(file_path: str, doc_type: str):
 
     return []
 
-# -------------------------------------------------------------
-# TRANSFORM
-# -------------------------------------------------------------
 @task(name="Transform Schedule Data", log_prints=True)
 def transform_schedule_task(data):
     """Build: summaries + row chunks for Schedules."""
     if not data:
-        print("No schedule data to transform.")
+        logger.info("No schedule data to transform.")
         return None
 
     summaries = aggregate_tasks_by_building(data)
     row_chunks, summary_chunks = create_semantic_chunks(data, summaries)
 
-    print(f"Created {len(row_chunks)} row chunks and {len(summary_chunks)} summary chunks.")
+    logger.info(f"Created {len(row_chunks)} row chunks and {len(summary_chunks)} summary chunks.")
     return (row_chunks, summary_chunks)
 
 @task(name="Transform URA Data", log_prints=True)
 def transform_ura_task(data):
-    """
-    Convert RegulatoryRule objects into semantic chunks for Vector DB.
-    """
     if not data:
         return []
 
@@ -78,19 +67,16 @@ def transform_ura_task(data):
             }
         })
 
-    print(f"Created {len(chunks)} semantic chunks for URA rules.")
+    logger.info(f"Created {len(chunks)} semantic chunks for URA rules.")
     return chunks
 
-# -------------------------------------------------------------
-# LOAD: POSTGRES
-# -------------------------------------------------------------
 @task(name="Load Postgres", log_prints=True)
 def load_to_postgres_task(data, doc_type: str):
     if not data:
-        print("No data to save to PostgreSQL.")
+        logger.warning("No data to save to PostgreSQL.")
         return
 
-    print(f"Saving {len(data)} SQL records for: {doc_type}")
+    logger.info(f"Saving {len(data)} SQL records for: {doc_type}")
 
     if doc_type == "ura_circular":
         objs = [
@@ -116,13 +102,10 @@ def load_to_postgres_task(data, doc_type: str):
         ]
         ProjectTask.objects.bulk_create(objs, ignore_conflicts=True)
 
-# -------------------------------------------------------------
-# LOAD: VECTOR DATABASE (Chroma)
-# -------------------------------------------------------------
 @task(name="Load Vector DB", log_prints=True)
 def load_to_vector_db_task(chunks):
     if not chunks:
-        print("No chunks to save to Vector DB.")
+        logger.info("No chunks to save to Vector DB.")
         return
 
     row_chunks = []
@@ -135,4 +118,4 @@ def load_to_vector_db_task(chunks):
         row_chunks = chunks
 
     total = index_chunks_to_chroma(row_chunks, summary_chunks)
-    print(f"Indexed {total} total semantic chunks into ChromaDB.")
+    logger.info(f"Indexed {total} total semantic chunks into ChromaDB.")

@@ -11,11 +11,6 @@ from pipeline.schemas import TaskSchema
 _MODEL = None
 _CHROMA = None
 
-
-# ============================================================
-# MODEL + CHROMA CLIENT
-# ============================================================
-
 def _get_model():
     global _MODEL
     if _MODEL is None:
@@ -28,11 +23,6 @@ def _get_chroma(persist_dir="./chroma_db"):
     if _CHROMA is None:
         _CHROMA = PersistentClient(path=persist_dir)
     return _CHROMA
-
-
-# ============================================================
-# AGGREGATE BY BUILDING
-# ============================================================
 
 def aggregate_tasks_by_building(tasks: List[TaskSchema]):
     groups = {}
@@ -61,18 +51,11 @@ def aggregate_tasks_by_building(tasks: List[TaskSchema]):
 
     return summaries
 
-
-# ============================================================
-# CREATE SEMANTIC CHUNKS
-# ============================================================
-
 def create_semantic_chunks(tasks: List[TaskSchema], summaries: Dict[str, Dict]):
     row_chunks = []
     summary_chunks = []
 
-    # ---------------------------
     # Row-Level Chunks
-    # ---------------------------
     for t in tasks:
         text = (
             f"Task {t.task_id}: {t.task_name}. "
@@ -98,9 +81,7 @@ def create_semantic_chunks(tasks: List[TaskSchema], summaries: Dict[str, Dict]):
             "metadata": meta,
         })
 
-    # ---------------------------
     # Summary-Level Chunks
-    # ---------------------------
     for b, s in summaries.items():
         lines = [
             f"{b} — Summary:",
@@ -122,10 +103,7 @@ def create_semantic_chunks(tasks: List[TaskSchema], summaries: Dict[str, Dict]):
 
     return row_chunks, summary_chunks
 
-
-# ============================================================
 # INDEX INTO CHROMA (NEW API)
-# ============================================================
 def _sanitize_metadata(meta: dict) -> dict:
     """
     Chroma metadata cannot contain None values.

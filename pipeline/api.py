@@ -1,10 +1,10 @@
 # pipeline/api.py
 import chromadb
 from ninja import NinjaAPI
-from typing import List, Dict, Any
+from typing import List
+from loguru import logger
 from sentence_transformers import SentenceTransformer
 
-# Import your schemas and models
 from pipeline.schemas import TaskSchema, RuleSchema
 from pipeline.models import ProjectTask, RegulatoryRule
 
@@ -26,39 +26,27 @@ _SEARCH_MODEL = None
 def get_search_model():
     global _SEARCH_MODEL
     if _SEARCH_MODEL is None:
-        print("Loading Embedding Model for Search...")
+        logger.info("Loading Embedding Model for Search...")
         _SEARCH_MODEL = SentenceTransformer(MODEL_NAME)
     return _SEARCH_MODEL
 
 def get_collection():
     client = chromadb.PersistentClient(path=CHROMA_PATH)
-    # We get the collection without defining the embedding function here,
-    # because we will generate embeddings manually to match chunk_utils.
     return client.get_or_create_collection(name=COLLECTION_NAME)
 
 
-# ==========================================
-# API ENDPOINTS
-# ==========================================
-
 @api.get("/tasks", response=List[TaskSchema])
 def list_tasks(request):
-    """List all extracted tasks from SQL DB"""
     tasks = ProjectTask.objects.all()
     return tasks
 
-# --- NEW ENDPOINT ---
 @api.get("/rules", response=List[RuleSchema])
 def list_rules(request):
-    """List all extracted URA Regulatory Rules"""
     return RegulatoryRule.objects.all()
 # --------------------
 
 @api.get("/search")
 def semantic_search(request, query: str):
-    """
-    Search for context using vector embeddings.
-    """
     try:
         # 1. Generate embedding for the query using the SAME model
         model = get_search_model()

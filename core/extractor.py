@@ -12,14 +12,11 @@ import camelot
 from pdf2image import convert_from_path
 import pytesseract
 import cv2
-
-# Import your clean utilities
 from pipeline.schemas import TaskSchema, RuleSchema
 from core.utils import parse_utils, merge_utils
 from core.utils.table_parser import LLMTableParser
 from core.llm_client import LLMClient  # Needed for URA text extraction
 
-# Setup Environment
 project_root = Path(__file__).resolve().parent.parent
 sys.path.append(str(project_root))
 load_dotenv(project_root / '.env')
@@ -34,9 +31,6 @@ class DocumentExtractor:
         # Direct client for unstructured text (URA rules)
         self.llm_client = LLMClient()
 
-        # ============================================================
-    # 1. PROJECT SCHEDULE EXTRACTION (Your existing robust logic)
-    # ============================================================
     def extract_project_schedule_hybrid(self, file_path: str) -> List[TaskSchema]:
         logger.info(f"[HYBRID] Starting extraction for {file_path}")
 
@@ -70,14 +64,8 @@ class DocumentExtractor:
         logger.info(f"[HYBRID] Completed. Extracted {len(final_schemas)} valid tasks.")
         return final_schemas
 
-    # ============================================================
-    # 2. URA CIRCULAR EXTRACTION (New Methods)
-    # ============================================================
     def extract_images_from_ura(self, file_path: str, output_dir: str = "extracted_images"):
-        """
-        Mandatory Requirement: Extract images/charts from URA Circular.
-        Saves full pages as images to capture context.
-        """
+
         # Create output directory relative to project root
         out_path = project_root / output_dir
         if not out_path.exists():
@@ -87,7 +75,6 @@ class DocumentExtractor:
         try:
             with pdfplumber.open(file_path) as pdf:
                 for i, page in enumerate(pdf.pages):
-                    # Render page to image (Resolution 300 for clarity)
                     im = page.to_image(resolution=300)
 
                     # Construct output path
@@ -98,10 +85,7 @@ class DocumentExtractor:
             logger.error(f"Image extraction failed: {e}")
 
     def extract_ura_rules_with_llm(self, file_path: str) -> List[RuleSchema]:
-        """
-        Extracts rules by chunking text.
-        UPDATED: Smaller chunk size to prevent LLM cutoff.
-        """
+
         logger.info("Extracting text for URA Rule processing...")
 
         text_content = ""
@@ -113,7 +97,6 @@ class DocumentExtractor:
             logger.error(f"PDF Text extraction failed: {e}")
             return []
 
-        # FIX: Reduced from 4000 to 1500 to prevent JSON truncation
         chunk_size = 1500
         chunks = [text_content[i:i+chunk_size] for i in range(0, len(text_content), chunk_size)]
 
@@ -121,7 +104,6 @@ class DocumentExtractor:
         valid_rules = []
 
         for i, chunk in enumerate(chunks):
-            # Simplified Prompt to save tokens
             prompt = f"""
                 Extract 'Regulatory Rules' from this text.
                 Return a JSON object: {{ "rules": [ {{ "rule_id": "...", "rule_summary": "...", "measurement_basis": "..." }} ] }}
@@ -131,7 +113,6 @@ class DocumentExtractor:
                 """
 
             try:
-                # Explicitly request 2000 tokens for the answer
                 data = self.llm_client.ask_json(prompt, temperature=0.0, max_tokens=2000)
 
                 count = 0
@@ -154,9 +135,6 @@ class DocumentExtractor:
         logger.info(f"[URA] Total Extracted: {len(valid_rules)} rules.")
         return valid_rules
 
-    # ============================================================
-    # 3. INTERNAL HELPERS
-    # ============================================================
     def _collect_raw_tables(self, file_path: str) -> List[List[List[str]]]:
         """
         Strategy: Camelot (Lattice) -> PDFPlumber -> OCR Fallback
@@ -216,7 +194,6 @@ if __name__ == "__main__":
     # Test harness
     base = Path(__file__).resolve().parent.parent
 
-    # Test 1: Project Schedule
     schedule_path = base / "data" / "Project schedule document.pdf"
     if schedule_path.exists():
         ext = DocumentExtractor(ocr_if_needed=True)
@@ -224,7 +201,6 @@ if __name__ == "__main__":
         print(f"\n--- [Schedule] Extracted {len(res)} tasks ---")
         if res: print(f"Sample: {res[0].dict()}")
 
-    # Test 2: URA Circular
     ura_path = base / "data" / "URA-Circular on GFA area definition.pdf"
     if ura_path.exists():
         print(f"\n--- [URA] Processing ---")
