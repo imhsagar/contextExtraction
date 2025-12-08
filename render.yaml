@@ -1,0 +1,27 @@
+databases:
+  - name: proplens_db
+    databaseName: proplens_db
+    user: proplens_user
+
+services:
+  - type: web
+    name: proplens-api
+    env: python
+    buildCommand: "./build.sh"
+    # Start Gunicorn (Production Server)
+    startCommand: "gunicorn proplens.wsgi:application"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.12
+      - key: DATABASE_URL
+        fromDatabase:
+          name: proplens_db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: EXTRACT_LLM_ENDPOINT
+        value: "https://api.openai.com/v1/chat/completions"
+      - key: PREFECT_API_URL
+        value: "http://localhost:4200/api"
