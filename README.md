@@ -30,8 +30,10 @@ This solution transforms raw PDF documents into queryable intelligence using a *
 **2. Environment Setup**
    1. git clone https://github.com/imhsagar/contextExtraction.git
    2. cd contextExtraction
-   3. python -m venv .venv
-   4. pip install -r requirements.txt
+   3. ~/.pyenv/versions/3.10.14/bin/python -m venv .venv
+   4. source .venv/bin/activate.fish  # (Or .bash if using bash)
+   5. pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/rocm6.2
+   6. pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/rocm6.2
 
 **3. Configuration**
     Create a .env file in the root directory. These settings are tuned for Local LLM stability

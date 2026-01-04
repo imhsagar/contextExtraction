@@ -27,10 +27,10 @@ def extract_document_task(file_path: str, doc_type: str):
 
     if doc_type == "ura_circular":
         extractor.extract_images_from_ura(file_path)
-        return extractor.extract_ura_rules_with_llm(file_path)
+        return extractor.extract_ura_rules_vision(file_path)
 
     elif doc_type == "project_schedule":
-        return extractor.extract_project_schedule_hybrid(file_path)
+        return extractor.extract_project_schedule_vision(file_path)
 
     return []
 
@@ -106,7 +106,7 @@ def load_to_postgres_task(data, doc_type: str):
             )
         ProjectTask.objects.bulk_create(objs, ignore_conflicts=True)
 
-@task(name="Load Vector DB", log_prints=True)
+@task(name="Load Vector DB", retries = 3,  log_prints=True)
 def load_to_vector_db_task(chunks):
     if not chunks:
         logger.info("No chunks to save to Vector DB.")

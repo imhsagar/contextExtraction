@@ -25,7 +25,6 @@ def merge_tasks(task_list: List[Any]) -> List[TaskSchema]:
         except (ValueError, TypeError):
             continue
 
-        # 3. CRITICAL FIX: Normalize Dates from LLM strings
         # LLM might return '2007-09-5', we convert it to a Python date object here.
         if "start_date" in t and isinstance(t["start_date"], str):
             t["start_date"] = _parse_date_flexible(t["start_date"])

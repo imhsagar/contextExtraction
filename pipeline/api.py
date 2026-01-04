@@ -3,7 +3,7 @@ import chromadb
 from ninja import NinjaAPI
 from typing import List
 from loguru import logger
-from sentence_transformers import SentenceTransformer
+from sentence_transformers import SentenceTransformer, CrossEncoder
 
 from pipeline.schemas import TaskSchema, RuleSchema
 from pipeline.models import ProjectTask, RegulatoryRule
@@ -20,8 +20,22 @@ COLLECTION_NAME = "project_docs"
 # 3. Use the SAME model as chunk_utils
 MODEL_NAME = "all-MiniLM-L6-v2"
 
+# 4. Cross-Encoder for Re-ranking (High Accuracy)
+# This model is trained specifically to score how relevant a text is to a query.
+RERANK_MODEL_NAME = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+
 # Load model once (global cache)
 _SEARCH_MODEL = None
+_RERANK_MODEL = None
+
+def get_rerank_model():
+    """Singleton to load the re-ranker model"""
+    global _RERANK_MODEL
+    if _RERANK_MODEL is None:
+        logger.info("Loading Cross-Encoder for Re-ranking...")
+        # Use a small, fast model to minimize latency
+        _RERANK_MODEL = CrossEncoder(RERANK_MODEL_NAME)
+    return _RERANK_MODEL
 
 def get_search_model():
     global _SEARCH_MODEL
@@ -60,23 +74,42 @@ def semantic_search(request, query: str):
             include=["documents", "metadatas"]
         )
 
-        # 3. Format Results
-        clean_results = []
-        if results and results.get('documents'):
-            # Chroma returns a list of lists (for multiple queries)
-            docs = results['documents'][0]
-            metas = results['metadatas'][0]
+        if not results or not results['documents']:
+            return {"query": query, "results": []}
 
-            for doc, meta in zip(docs, metas):
-                clean_results.append({
-                    "content": doc,
-                    "source": meta.get("source", "Unknown"),
-                    "type": meta.get("type", "Unknown"),
-                    "building": meta.get("building", "Unknown")
-                })
+        retrieved_docs = results['documents'][0]
+        retrieved_metas = results['metadatas'][0]
 
-        return {"query": query, "results": clean_results}
+        cross_model = get_rerank_model()
+
+        sentence_combinations = [[query, doc_text] for doc_text in retrieved_docs]
+
+        similarity_scores = cross_model.predict(sentence_combinations)
+
+        scored_results = []
+        for idx, score in enumerate(similarity_scores):
+            scored_results.append({
+                "content": retrieved_docs[idx],
+                "meta": retrieved_metas[idx],
+                "score": float(score)  # Convert numpy float to python float
+            })
+
+        # Sort DESCENDING by the new Cross-Encoder score
+        scored_results.sort(key=lambda x: x["score"], reverse=True)
+
+        final_output = []
+        for item in scored_results[:5]:  # Take only the top 5 winners
+            meta = item["meta"]
+            final_output.append({
+                "content": item["content"],
+                "score": item["score"], # Helpful for debugging relevance
+                "source": meta.get("source", "Unknown"),
+                "type": meta.get("type", "Unknown"),
+                "building": meta.get("building", "Unknown")
+            })
+
+        return {"query": query, "results": final_output}
 
     except Exception as e:
-        print(f"Search Error: {e}")
+        logger.error(f"Search Error: {e}")
         return {"query": query, "results": [], "error": str(e)}

@@ -11,7 +11,7 @@ class LLMClient:
     def __init__(self, base_url: Optional[str] = None, model: Optional[str] = None):
         # --- Configuration for Local LLM (Fallback) ---
         default_local_url = os.getenv("EXTRACT_LLM_ENDPOINT", "http://localhost:1234/v1/chat/completions")
-        default_local_model = os.getenv("EXTRACT_LLM_MODEL", "qwen2.5-7b-instruct")
+        default_local_model = os.getenv("EXTRACT_LLM_MODEL", "qwen2.5-vl-7b-instruct")
         self.local_base_url = base_url or default_local_url
         self.local_model = model or default_local_model
 
